@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>VSPhone Token Fix</title>
+    <style>
+        body { background: #000; color: #0f0; font-family: monospace; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .box { border: 1px solid #0f0; padding: 20px; width: 80%; max-width: 600px; background: #111; }
+        #res { word-break: break-all; color: #fff; background: #222; padding: 10px; margin-top: 10px; border: 1px solid #444; }
+        button { background: #0f0; color: #000; border: none; padding: 10px; cursor: pointer; margin-top: 10px; width: 100%; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <div>STATUS: <span id="st">Đang chờ...</span></div>
+        <div id="res">Link sẽ hiện ở đây...</div>
+        <button onclick="copy()">COPY LINK</button>
+    </div>
+
+<script>
+    // CHÚ Ý: Copy token từ F12 dán vào đây, xóa hết khoảng trắng nếu có
+    const MY_TOKEN = "daLtRpZr6rOD8yuavm5jwgj3MkvfzwDA".replace(/[^a-zA-Z0-9._-]/g, ''); 
+    const PAD_CODE = "ACP250929NBUC1VX";
+
+    async function getLink() {
+        const st = document.getElementById('st');
+        const res = document.getElementById('res');
+        
+        try {
+            st.innerText = "Đang gọi API...";
+            const r = await fetch("https://api.vsphone.com/vsphone/api/padApi/stsToken", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'token': MY_TOKEN
+                },
+                body: JSON.stringify({ padCode: PAD_CODE })
+            });
+
+            const d = await r.json();
+            if (d.data && d.data.token) {
+                const auth = btoa(JSON.stringify({ token: d.data.token, ts: Date.now() }));
+                res.innerText = "https://cloud.vsphone.com/#vsphone_auth_" + auth;
+                st.innerText = "XONG!";
+            } else {
+                st.innerText = "LỖI: " + (d.msg || "Token sai hoặc hết hạn");
+            }
+        } catch (e) {
+            st.innerText = "LỖI KẾT NỐI (Kiểm tra CORS hoặc Mạng)";
+        }
+    }
+
+    function copy() {
+        navigator.clipboard.writeText(document.getElementById('res').innerText);
+        alert("Đã copy!");
+    }
+
+    if(MY_TOKEN.length > 10) getLink();
+    else document.getElementById('st').innerText = "CHƯA NHẬP TOKEN VÀO CODE!";
+</script>
+</body>
+</html>
