@@ -2,61 +2,98 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>VSPhone Token Fix</title>
+    <title>VSPhone Auto Finder</title>
     <style>
-        body { background: #000; color: #0f0; font-family: monospace; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .box { border: 1px solid #0f0; padding: 20px; width: 80%; max-width: 600px; background: #111; }
-        #res { word-break: break-all; color: #fff; background: #222; padding: 10px; margin-top: 10px; border: 1px solid #444; }
-        button { background: #0f0; color: #000; border: none; padding: 10px; cursor: pointer; margin-top: 10px; width: 100%; font-weight: bold; }
+        body { background: #0d1117; color: #58a6ff; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { background: #161b22; border: 1px solid #30363d; padding: 30px; border-radius: 12px; width: 450px; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+        h2 { color: #7ee787; margin-bottom: 20px; font-size: 1.5rem; }
+        .status-box { color: #8b949e; margin-bottom: 15px; font-size: 0.9rem; }
+        .result-box { background: #000; color: #7ee787; padding: 15px; border-radius: 6px; word-break: break-all; border: 1px solid #238636; font-family: monospace; display: none; margin-top: 15px; }
+        button { background: #238636; color: #fff; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.2s; }
+        button:hover { background: #2ea043; }
+        .footer { font-size: 0.7rem; color: #484f58; margin-top: 20px; }
     </style>
 </head>
 <body>
-    <div class="box">
-        <div>STATUS: <span id="st">Đang chờ...</span></div>
-        <div id="res">Link sẽ hiện ở đây...</div>
-        <button onclick="copy()">COPY LINK</button>
-    </div>
+
+<div class="container">
+    <h2>PAD Auto Finder 🚀</h2>
+    <div id="status" class="status-box">Đang chờ Admin Token...</div>
+    
+    <div id="result" class="result-box"></div>
+    
+    <button id="mainBtn" onclick="startProcess()">CHẠY TỰ ĐỘNG</button>
+    
+    <div class="footer">Dán URL nhận được vào Discord: /settoken [URL]</div>
+</div>
 
 <script>
-    // CHÚ Ý: Copy token từ F12 dán vào đây, xóa hết khoảng trắng nếu có
-    const MY_TOKEN = "daLtRpZr6rOD8yuavm5jwgj3MkvfzwDA".replace(/[^a-zA-Z0-9._-]/g, ''); 
-    const PAD_CODE = "ACP250929NBUC1VX";
+    // --- CẤU HÌNH ---
+    const ADMIN_TOKEN = "DÁN_TOKEN_EY_CỦA_BẠN_VÀO_ĐÂY"; 
+    const API_BASE = "https://api.vsphone.com/vsphone/api";
 
-    async function getLink() {
-        const st = document.getElementById('st');
-        const res = document.getElementById('res');
-        
+    async function startProcess() {
+        const status = document.getElementById('status');
+        const result = document.getElementById('result');
+        const btn = document.getElementById('mainBtn');
+
+        if (ADMIN_TOKEN.includes("DÁN_TOKEN")) {
+            status.innerText = "❌ Bạn chưa dán Token vào code!";
+            return;
+        }
+
         try {
-            st.innerText = "Đang gọi API...";
-            const r = await fetch("https://api.vsphone.com/vsphone/api/padApi/stsToken", {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'token': MY_TOKEN
-                },
-                body: JSON.stringify({ padCode: PAD_CODE })
-            });
+            btn.disabled = true;
+            status.innerText = "🔍 Đang quét danh sách máy ảo...";
 
-            const d = await r.json();
-            if (d.data && d.data.token) {
-                const auth = btoa(JSON.stringify({ token: d.data.token, ts: Date.now() }));
-                res.innerText = "https://cloud.vsphone.com/#vsphone_auth_" + auth;
-                st.innerText = "XONG!";
-            } else {
-                st.innerText = "LỖI: " + (d.msg || "Token sai hoặc hết hạn");
+            // 1. Tìm PAD đầu tiên
+            const listRes = await fetch(`${API_BASE}/userEquipment/listEquipment`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'token': ADMIN_TOKEN.trim() },
+                body: JSON.stringify({ pageNo: 1, pageSize: 5 })
+            });
+            const listData = await listRes.json();
+            const padCode = listData.data?.records?.[0]?.padCode;
+
+            if (!padCode) {
+                status.innerText = "❌ Không tìm thấy máy nào trong tài khoản.";
+                btn.disabled = false;
+                return;
             }
-        } catch (e) {
-            st.innerText = "LỖI KẾT NỐI (Kiểm tra CORS hoặc Mạng)";
+
+            status.innerText = `✅ Đã chọn máy: ${padCode}. Đang lấy STS...`;
+
+            // 2. Lấy STS Token
+            const stsRes = await fetch(`${API_BASE}/padApi/stsToken`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'token': ADMIN_TOKEN.trim() },
+                body: JSON.stringify({ padCode: padCode })
+            });
+            const stsData = await stsRes.json();
+            const stsToken = stsData.data?.token;
+
+            if (stsToken) {
+                const auth = btoa(JSON.stringify({ token: stsToken, ts: Date.now() }));
+                const finalUrl = `https://cloud.vsphone.com/#vsphone_auth_${auth}`;
+                
+                result.innerText = finalUrl;
+                result.style.display = 'block';
+                status.innerText = "🚀 THÀNH CÔNG!";
+                
+                // Tự động copy
+                navigator.clipboard.writeText(finalUrl);
+                btn.innerText = "ĐÃ COPY VÀO BỘ NHỚ!";
+            } else {
+                status.innerText = "❌ Lỗi: " + (stsData.msg || "Token Admin hết hạn.");
+                btn.disabled = false;
+            }
+
+        } catch (err) {
+            status.innerText = "❌ Lỗi kết nối (CORS hoặc Mạng)";
+            btn.disabled = false;
         }
     }
-
-    function copy() {
-        navigator.clipboard.writeText(document.getElementById('res').innerText);
-        alert("Đã copy!");
-    }
-
-    if(MY_TOKEN.length > 10) getLink();
-    else document.getElementById('st').innerText = "CHƯA NHẬP TOKEN VÀO CODE!";
 </script>
+
 </body>
 </html>
